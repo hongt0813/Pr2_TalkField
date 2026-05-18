@@ -7,8 +7,8 @@
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .container { width: 100%; max-width: 600px; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        h1 { text-align: center; color: black; margin-top: 5px; margin-bottom: 20px; }
-        h2 { text-align: center; color: #333; margin-top: 10px; margin-bottom: 0; }
+        h1 { text-align: center; color: black; margin-top: 0px; margin-bottom: 20px; }
+        h2 { text-align: center; color: gray; font-size: 15px; margin-top: 0; margin-bottom: 0; }
         .input-group { display: flex; gap: 10px; margin-bottom: 10px; }
         input, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
         textarea { resize: vertical; height: 100px; }
@@ -16,10 +16,9 @@
         button:hover { background-color: #45a049; }
         .message-list { margin-top: 30px; }
         .message-card { background: #fafafa; border-left: 5px solid #2196F3; padding: 15px; margin-bottom: 15px; border-radius: 0 6px 6px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .message-header { display: flex; justify-content: flex-start; align-items: center; font-weight: bold; color: #555; margin-bottom: 8px; font-size: 14px; gap: 5px; }
-        .message-header span { display: inline-flex; align-items: center; }
-        .message-text { color: #333; word-break: break-all; white-space: pre-line; text-align: center; margin-top: 10px; }
-        .delete-btn { background-color: #ff4d4d; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; height: auto; }
+        .message-header { display: flex; justify-content: space-between; font-weight: bold; color: #555; margin-bottom: 8px; font-size: 14px; }
+        .message-text { color: #333; word-break: break-all; white-space: pre-line; text-align: justify; }
+        .delete-btn { background-color: #ff4d4d; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; width: 360px; height: 28px; }
         .delete-btn:hover { background-color: #e60000; }
     </style>
 </head>
@@ -74,19 +73,17 @@
             return;
         }
 
-        let existingUserPost = null;
+        let isDuplicate = false;
         for (let key in localMessages) {
             if (localMessages[key].name === name) {
-                existingUserPost = localMessages[key];
+                isDuplicate = true;
                 break;
             }
         }
 
-        if (existingUserPost) {
-            if (existingUserPost.password !== password) {
-                alert("이미 존재하는 이름입니다. 해당 이름의 올바른 비밀번호를 입력하거나 다른 이름을 사용해주세요.");
-                return;
-            }
+        if (isDuplicate) {
+            alert("이미 존재하는 이름입니다.");
+            return;
         }
 
         const newPostRef = push(messagesRef);
@@ -118,9 +115,9 @@
             card.innerHTML = `
                 <div class="message-header">
                     <span>${escapeHtml(msg.name)} <small style="color:#aaa; font-weight:normal; margin-left:10px;">${msg.date}</small></span>
-                    <button class="delete-btn" data-id="${key}">[삭제 버튼]</button>
+                    <button class="delete-btn" data-id="${key}">삭제</button>
                 </div>
-                <div class="message-text">"${escapeHtml(msg.text)}"</div>
+                <div class="message-text">${escapeHtml(msg.text)}</div>
             `;
             messageList.appendChild(card);
         });
