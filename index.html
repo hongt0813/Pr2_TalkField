@@ -46,7 +46,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, push, update, onValue, remove, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getDatabase, ref, push, set, update, onValue, remove, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBabFaOQI84H9i6cvbYk6O_-3Ac0c0Fs7U",
@@ -65,6 +65,7 @@
     const MASTER_PASSWORD = "readyfor0813"; 
 
     let localMessages = {};
+    let lastSubmitTime = 0;
 
     document.getElementById("submitBtn").addEventListener("click", async () => {
         const submitBtn = document.getElementById("submitBtn");
@@ -84,6 +85,12 @@
         const lowerName = name.toLowerCase();
         if (lowerName === "hacker" || lowerName === "bot") {
             alert("사용할 수 없는 이름입니다.");
+            return;
+        }
+
+        const currentTime = Date.now();
+        if (currentTime - lastSubmitTime < 3000) {
+            alert("도배 방지: 3초 후에 다시 시도해 주세요.");
             return;
         }
 
@@ -110,24 +117,23 @@
 
         try {
             const newPostRef = push(messagesRef);
-            const updates = {};
             
-            updates[`messages/${newPostRef.key}`] = {
+            await set(newPostRef, {
                 name: name,
                 password: password,
                 text: text,
                 date: new Date().toLocaleString('ko-KR'),
-                pinned: false
-            };
-            updates['messages/lastTimestamp'] = serverTimestamp();
+                pinned: false,
+                timestamp: serverTimestamp()
+            });
 
-            await update(ref(db), updates);
+            lastSubmitTime = Date.now();
 
             usernameInput.value = "";
             passwordInput.value = "";
             messageInput.value = "";
         } catch (error) {
-            alert("도배 방지 시스템: 잠시 후 다시 시도해 주세요.");
+            alert("서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
         } finally {
             setTimeout(() => {
                 submitBtn.disabled = false;
@@ -143,7 +149,7 @@
         const messageList = document.getElementById("messageList");
         messageList.innerHTML = "";
 
-        const keys = Object.keys(data).filter(key => key !== 'lastTimestamp');
+        const keys = Object.keys(data);
         
         const pinnedKeys = keys.filter(key => data[key].pinned === true).reverse();
         const normalKeys = keys.filter(key => !data[key].pinned).reverse();
