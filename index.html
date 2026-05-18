@@ -46,7 +46,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, push, set, update, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getDatabase, ref, push, update, onValue, remove, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBabFaOQI84H9i6cvbYk6O_-3Ac0c0Fs7U",
@@ -108,23 +108,32 @@
         submitBtn.disabled = true;
         submitBtn.innerText = "3초 대기...";
 
-        const newPostRef = push(messagesRef);
-        await set(newPostRef, {
-            name: name,
-            password: password,
-            text: text,
-            date: new Date().toLocaleString('ko-KR'),
-            pinned: false
-        });
+        try {
+            const newPostRef = push(messagesRef);
+            const updates = {};
+            
+            updates[`messages/${newPostRef.key}`] = {
+                name: name,
+                password: password,
+                text: text,
+                date: new Date().toLocaleString('ko-KR'),
+                pinned: false
+            };
+            updates['messages/lastTimestamp'] = serverTimestamp();
 
-        usernameInput.value = "";
-        passwordInput.value = "";
-        messageInput.value = "";
+            await update(ref(db), updates);
 
-        setTimeout(() => {
-            submitBtn.disabled = false;
-            submitBtn.innerText = "글 남기기";
-        }, 3000);
+            usernameInput.value = "";
+            passwordInput.value = "";
+            messageInput.value = "";
+        } catch (error) {
+            alert("도배 방지 시스템: 잠시 후 다시 시도해 주세요.");
+        } finally {
+            setTimeout(() => {
+                submitBtn.disabled = false;
+                submitBtn.innerText = "글 남기기";
+            }, 3000);
+        }
     });
 
     onValue(messagesRef, (snapshot) => {
@@ -134,7 +143,7 @@
         const messageList = document.getElementById("messageList");
         messageList.innerHTML = "";
 
-        const keys = Object.keys(data);
+        const keys = Object.keys(data).filter(key => key !== 'lastTimestamp');
         
         const pinnedKeys = keys.filter(key => data[key].pinned === true).reverse();
         const normalKeys = keys.filter(key => !data[key].pinned).reverse();
