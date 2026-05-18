@@ -15,11 +15,15 @@
         button { width: 100%; padding: 12px; background-color: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; }
         button:hover { background-color: #45a049; }
         .message-list { margin-top: 30px; }
-        .message-card { background: #fafafa; border-left: 5px solid #2196F3; padding: 15px; margin-bottom: 15px; border-radius: 0 6px 6px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .message-header { display: flex; justify-content: space-between; font-weight: bold; color: #555; margin-bottom: 8px; font-size: 14px; }
+        .message-card { background: #fafafa; border-left: 5px solid #2196F3; padding: 15px; margin-bottom: 15px; border-radius: 0 6px 6px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; }
+        .message-card.pinned { background: #fffde7; border-left: 5px solid #ffc107; }
+        .message-header { display: flex; justify-content: space-between; font-weight: bold; color: #555; margin-bottom: 8px; font-size: 14px; align-items: center; }
         .message-text { color: #333; word-break: break-all; white-space: pre-line; text-align: justify; }
-        .delete-btn { background-color: #ff4d4d; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; width: 120px; height: 25px; }
+        .btn-group { display: flex; gap: 5px; }
+        .delete-btn { background-color: #ff4d4d; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; height: 25px; }
         .delete-btn:hover { background-color: #e60000; }
+        .pin-btn { background-color: #ffc107; color: #333; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; height: 25px; font-weight: bold; }
+        .pin-btn:hover { background-color: #ffa000; }
     </style>
 </head>
 <body>
@@ -41,7 +45,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, push, set, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getDatabase, ref, push, set, update, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBabFaOQI84H9i6cvbYk6O_-3Ac0c0Fs7U",
@@ -56,6 +60,8 @@
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
     const messagesRef = ref(db, 'messages');
+
+    const MASTER_PASSWORD = "readyfor0813"; 
 
     let localMessages = {};
 
@@ -91,7 +97,8 @@
             name: name,
             password: password,
             text: text,
-            date: new Date().toLocaleString('ko-KR')
+            date: new Date().toLocaleString('ko-KR'),
+            pinned: false
         });
 
         usernameInput.value = "";
@@ -106,16 +113,28 @@
         const messageList = document.getElementById("messageList");
         messageList.innerHTML = "";
 
-        const sortedKeys = Object.keys(data).reverse();
+        const keys = Object.keys(data);
+        
+        const pinnedKeys = keys.filter(key => data[key].pinned === true).reverse();
+        const normalKeys = keys.filter(key => !data[key].pinned).reverse();
+        
+        const sortedKeys = [...pinnedKeys, ...normalKeys];
 
         sortedKeys.forEach(key => {
             const msg = data[key];
             const card = document.createElement("div");
-            card.className = "message-card";
+            card.className = `message-card ${msg.pinned ? 'pinned' : ''}`;
+            
             card.innerHTML = `
                 <div class="message-header">
-                    <span>${escapeHtml(msg.name)} <small style="color:#aaa; font-weight:normal; margin-left:10px;">${msg.date}</small></span>
-                    <button class="delete-btn" data-id="${key}" style = "font-size: 12px">삭제</button>
+                    <span>
+                        ${msg.pinned ? '📌 ' : ''}${escapeHtml(msg.name)} 
+                        <small style="color:#aaa; font-weight:normal; margin-left:10px;">${msg.date}</small>
+                    </span>
+                    <div class="btn-group">
+                        <button class="pin-btn" data-id="${key}">${msg.pinned ? '고정 해제' : '고정'}</button>
+                        <button class="delete-btn" data-id="${key}">삭제</button>
+                    </div>
                 </div>
                 <div class="message-text">${escapeHtml(msg.text)}</div>
             `;
@@ -128,7 +147,34 @@
                 deleteMessage(id);
             });
         });
+
+        document.querySelectorAll(".pin-btn").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                const id = e.target.getAttribute("data-id");
+                togglePinMessage(id);
+            });
+        });
     });
+
+    async function togglePinMessage(id) {
+        const targetMessage = localMessages[id];
+        if (!targetMessage) return;
+
+        const currentPinnedStatus = targetMessage.pinned || false;
+        const actionText = currentPinnedStatus ? "고정 해제" : "고정";
+
+        const inputMasterPassword = prompt(`제작자 인증이 필요합니다.\n마스터 비밀번호를 입력하세요:`);
+        if (inputMasterPassword === null) return;
+
+        if (inputMasterPassword === MASTER_PASSWORD) {
+            await update(ref(db, `messages/${id}`), {
+                pinned: !currentPinnedStatus
+            });
+            alert(`글이 성공적으로 ${actionText}되었습니다.`);
+        } else {
+            alert("제작자 비밀번호가 일치하지 않습니다.");
+        }
+    }
 
     async function deleteMessage(id) {
         const targetMessage = localMessages[id];
