@@ -32,7 +32,7 @@
     <h2>홍태범이 만든</h2>
     <h1>충남과학고 대화의 장</h1>
     <div class="input-group">
-        <input type="text" id="username" placeholder="이름(중복 불가)" required>
+        <input type="text" id="username" placeholder="이름" required>
         <input type="password" id="password" placeholder="비밀번호" required>
     </div>
     <div style="margin-bottom: 10px;">
@@ -79,16 +79,27 @@
             return;
         }
 
-        let isDuplicate = false;
+        const lowerName = name.toLowerCase();
+        if (lowerName === "hacker" || lowerName === "bot") {
+            alert("사용할 수 없는 이름입니다.");
+            return;
+        }
+
+        let nameExists = false;
+        let passwordMatches = false;
+
         for (let key in localMessages) {
             if (localMessages[key].name === name) {
-                isDuplicate = true;
-                break;
+                nameExists = true;
+                if (localMessages[key].password === password) {
+                    passwordMatches = true;
+                    break;
+                }
             }
         }
 
-        if (isDuplicate) {
-            alert("이미 존재하는 이름입니다.");
+        if (nameExists && !passwordMatches) {
+            alert("이미 존재하는 이름입니다. 비밀번호를 확인해 주세요.");
             return;
         }
 
