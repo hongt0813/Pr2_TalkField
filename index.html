@@ -152,6 +152,8 @@
 
         sortedKeys.forEach(key => {
             const msg = data[key];
+            if (!msg.name) return;
+            
             const card = document.createElement("div");
             card.className = `message-card ${msg.pinned ? 'pinned' : ''}`;
             
