@@ -46,7 +46,8 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, push, set, update, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getDatabase, ref, push, update, onValue, remove, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBabFaOQI84H9i6cvbYk6O_-3Ac0c0Fs7U",
@@ -60,17 +61,28 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getDatabase(app);
+    const auth = getAuth(app);
     const messagesRef = ref(db, 'messages');
 
     const MASTER_PASSWORD = "readyfor0813"; 
-
     let localMessages = {};
+    let currentUser = null;
+
+    // 페이지 로드 시 백그라운드에서 익명 인증 수행
+    signInAnonymously(auth)
+        .then((result) => { currentUser = result.user; })
+        .catch((error) => { console.error("인증 실패:", error); });
 
     document.getElementById("submitBtn").addEventListener("click", async () => {
         const submitBtn = document.getElementById("submitBtn");
         const usernameInput = document.getElementById("username");
         const passwordInput = document.getElementById("password");
         const messageInput = document.getElementById("message");
+
+        if (!currentUser) {
+            alert("서버 연결 중입니다. 잠시 후 다시 시도해 주세요.");
+            return;
+        }
 
         const name = usernameInput.value.trim();
         const password = passwordInput.value.trim();
@@ -87,18 +99,11 @@
             return;
         }
 
-        const lastSubmit = localStorage.getItem("lastSubmitTime");
-        const currentTime = Date.now();
-        if (lastSubmit && (currentTime - parseInt(lastSubmit) < 3000)) {
-            alert("도배 방지: 3초 후에 다시 시도해 주세요.");
-            return;
-        }
-
         let nameExists = false;
         let passwordMatches = false;
 
         for (let key in localMessages) {
-            if (localMessages[key].name === name) {
+            if (localMessages[key] && localMessages[key].name === name) {
                 nameExists = true;
                 if (localMessages[key].password === password) {
                     passwordMatches = true;
@@ -114,25 +119,28 @@
 
         submitBtn.disabled = true;
         submitBtn.innerText = "3초 대기...";
-        localStorage.setItem("lastSubmitTime", Date.now());
 
         try {
             const newPostRef = push(messagesRef);
+            const updates = {};
             
-            await set(newPostRef, {
+            // 데이터 저장과 유저별 타임스탬프 기록을 트랜잭션 형태로 묶어서 전송
+            updates[`messages/${newPostRef.key}`] = {
                 name: name,
                 password: password,
                 text: text,
                 date: new Date().toLocaleString('ko-KR'),
                 pinned: false
-            });
+            };
+            updates[`user_timeouts/${currentUser.uid}`] = serverTimestamp();
+
+            await update(ref(db), updates);
 
             usernameInput.value = "";
             passwordInput.value = "";
             messageInput.value = "";
         } catch (error) {
-            alert("전송 실패: Firebase Rules 설정을 확인해 주세요.");
-            localStorage.removeItem("lastSubmitTime");
+            alert("도배 방지 시스템: 3초 쿨타임이 적용 중이거나 전송이 차단되었습니다.");
         } finally {
             setTimeout(() => {
                 submitBtn.disabled = false;
@@ -149,10 +157,8 @@
         messageList.innerHTML = "";
 
         const keys = Object.keys(data);
-        
         const pinnedKeys = keys.filter(key => data[key] && data[key].pinned === true).reverse();
         const normalKeys = keys.filter(key => data[key] && !data[key].pinned).reverse();
-        
         const sortedKeys = [...pinnedKeys, ...normalKeys];
 
         sortedKeys.forEach(key => {
