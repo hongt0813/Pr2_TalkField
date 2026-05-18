@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pr2_TalkField</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f6f9; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { width: 100%; max-width: 600px; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: black; margin-top: 0px; margin-bottom: 20px; }
+        h2 { text-align: center; color: gray; font-size: 15px; margin-top: 0; margin-bottom: 0; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        input, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        textarea { resize: vertical; height: 100px; }
+        button { width: 100%; padding: 12px; background-color: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        button:hover { background-color: #45a049; }
+        .message-list { margin-top: 30px; }
+        .message-card { background: #fafafa; border-left: 5px solid #2196F3; padding: 15px; margin-bottom: 15px; border-radius: 0 6px 6px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .message-header { display: flex; justify-content: space-between; font-weight: bold; color: #555; margin-bottom: 8px; font-size: 14px; }
+        .message-text { color: #333; word-break: break-all; white-space: pre-line; }
+        .delete-btn { background-color: #ff4d4d; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .delete-btn:hover { background-color: #e60000; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>홍태범이 만든</h2>
+    <h1>충남과학고 대화의 장</h1>
+    <div class="input-group">
+        <input type="text" id="username" placeholder="이름(중복 불가)" required>
+        <input type="password" id="password" placeholder="비밀번호" required>
+    </div>
+    <div style="margin-bottom: 10px;">
+        <textarea id="message" placeholder="하고 싶은 말을 적어주세요..." required></textarea>
+    </div>
+    <button id="submitBtn">글 남기기</button>
+
+    <div class="message-list" id="messageList"></div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, push, set, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBabFaOQI84H9i6cvbYk6O_-3Ac0c0Fs7U",
+        authDomain: "pr2-talkfield.firebaseapp.com",
+        projectId: "pr2-talkfield",
+        storageBucket: "pr2-talkfield.firebasestorage.app",
+        messagingSenderId: "498223921189",
+        appId: "1:498223921189:web:5a05b629855b610e79e7cc",
+        measurementId: "G-JFLDTDXF11"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const messagesRef = ref(db, 'messages');
+
+    let localMessages = {};
+
+    document.getElementById("submitBtn").addEventListener("click", async () => {
+        const usernameInput = document.getElementById("username");
+        const passwordInput = document.getElementById("password");
+        const messageInput = document.getElementById("message");
+
+        const name = usernameInput.value.trim();
+        const password = passwordInput.value.trim();
+        const text = messageInput.value.trim();
+
+        if (!name || !password || !text) {
+            alert("모든 입력창을 채워 주십시오.");
+            return;
+        }
+
+        let isDuplicate = false;
+        for (let key in localMessages) {
+            if (localMessages[key].name === name) {
+                isDuplicate = true;
+                break;
+            }
+        }
+
+        if (isDuplicate) {
+            alert("이미 존재하는 이름입니다.");
+            return;
+        }
+
+        const newPostRef = push(messagesRef);
+        await set(newPostRef, {
+            name: name,
+            password: password,
+            text: text,
+            date: new Date().toLocaleString('ko-KR')
+        });
+
+        usernameInput.value = "";
+        passwordInput.value = "";
+        messageInput.value = "";
+    });
+
+    onValue(messagesRef, (snapshot) => {
+        const data = snapshot.val() || {};
+        localMessages = data;
+        
+        const messageList = document.getElementById("messageList");
+        messageList.innerHTML = "";
+
+        const sortedKeys = Object.keys(data).reverse();
+
+        sortedKeys.forEach(key => {
+            const msg = data[key];
+            const card = document.createElement("div");
+            card.className = "message-card";
+            card.innerHTML = `
+                <div class="message-header">
+                    <span>${escapeHtml(msg.name)} <small style="color:#aaa; font-weight:normal; margin-left:10px;">${msg.date}</small></span>
+                    <button class="delete-btn" data-id="${key}">삭제</button>
+                </div>
+                <div class="message-text">${escapeHtml(msg.text)}</div>
+            `;
+            messageList.appendChild(card);
+        });
+
+        document.querySelectorAll(".delete-btn").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                const id = e.target.getAttribute("data-id");
+                deleteMessage(id);
+            });
+        });
+    });
+
+    async function deleteMessage(id) {
+        const targetMessage = localMessages[id];
+        if (!targetMessage) return;
+
+        const inputPassword = prompt(`'${targetMessage.name}'님의 비밀번호를 입력하세요:`);
+        if (inputPassword === null) return;
+
+        if (inputPassword === targetMessage.password) {
+            await remove(ref(db, `messages/${id}`));
+            alert("글이 성공적으로 삭제되었습니다.");
+        } else {
+            alert("비밀번호가 일치하지 않습니다.");
+        }
+    }
+
+    function escapeHtml(text) {
+        return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+    }
+</script>
+</body>
+</html>
