@@ -64,8 +64,16 @@
     const auth = getAuth(app);
     const messagesRef = ref(db, 'messages');
 
-    const MASTER_PASSWORD = "readyfor0813"; 
+    const MASTER_PASSWORD_HASH = "8c696f43da13b6d4036ec0815127814b7e87b7a4214690838e1261a8ef6a928c"; 
     let localMessages = {};
+
+    async function hashPassword(password) {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(password);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
 
     document.getElementById("submitBtn").addEventListener("click", async () => {
         const submitBtn = document.getElementById("submitBtn");
@@ -74,10 +82,10 @@
         const messageInput = document.getElementById("message");
 
         const name = usernameInput.value.trim();
-        const password = passwordInput.value.trim();
+        const rawPassword = passwordInput.value.trim();
         const text = messageInput.value.trim();
 
-        if (!name || !password || !text) {
+        if (!name || !rawPassword || !text) {
             alert("모든 입력창을 채워 주십시오.");
             return;
         }
@@ -88,13 +96,15 @@
             return;
         }
 
+        const hashedPassword = await hashPassword(rawPassword);
+
         let nameExists = false;
         let passwordMatches = false;
 
         for (let key in localMessages) {
             if (localMessages[key] && localMessages[key].name === name) {
                 nameExists = true;
-                if (localMessages[key].password === password) {
+                if (localMessages[key].password === hashedPassword) {
                     passwordMatches = true;
                     break;
                 }
@@ -118,7 +128,7 @@
             const newPostRef = push(messagesRef);
             await set(newPostRef, {
                 name: name,
-                password: password,
+                password: hashedPassword,
                 text: text,
                 date: new Date().toLocaleString('ko-KR'),
                 pinned: false
@@ -201,7 +211,9 @@
         const inputMasterPassword = prompt(`제작자 인증이 필요합니다.\n마스터 비밀번호를 입력하세요:`);
         if (inputMasterPassword === null) return;
 
-        if (inputMasterPassword === MASTER_PASSWORD) {
+        const inputHash = await hashPassword(inputMasterPassword.trim());
+
+        if (inputHash === MASTER_PASSWORD_HASH) {
             await update(ref(db, `messages/${id}`), {
                 pinned: !currentPinnedStatus
             });
@@ -218,9 +230,11 @@
         const inputPassword = prompt(`'${targetMessage.name}'님의 비밀번호를 입력하세요:`);
         if (inputPassword === null) return;
 
-        if (inputPassword === targetMessage.password) {
+        const inputHash = await hashPassword(inputPassword.trim());
+
+        if (inputHash === targetMessage.password) {
             await remove(ref(db, `messages/${id}`));
-            alert("글이 성공적으로 axes가 삭제되었습니다.");
+            alert("글이 성공적으로 삭제되었습니다.");
         } else {
             alert("비밀번호가 일치하지 않습니다.");
         }
