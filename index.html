@@ -46,7 +46,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getDatabase, ref, push, set, update, onValue, remove, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getDatabase, ref, push, set, update, onValue, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyBabFaOQI84H9i6cvbYk6O_-3Ac0c0Fs7U",
@@ -65,7 +65,6 @@
     const MASTER_PASSWORD = "readyfor0813"; 
 
     let localMessages = {};
-    let lastSubmitTime = 0;
 
     document.getElementById("submitBtn").addEventListener("click", async () => {
         const submitBtn = document.getElementById("submitBtn");
@@ -88,8 +87,9 @@
             return;
         }
 
+        const lastSubmit = localStorage.getItem("lastSubmitTime");
         const currentTime = Date.now();
-        if (currentTime - lastSubmitTime < 3000) {
+        if (lastSubmit && (currentTime - parseInt(lastSubmit) < 3000)) {
             alert("도배 방지: 3초 후에 다시 시도해 주세요.");
             return;
         }
@@ -114,6 +114,7 @@
 
         submitBtn.disabled = true;
         submitBtn.innerText = "3초 대기...";
+        localStorage.setItem("lastSubmitTime", Date.now());
 
         try {
             const newPostRef = push(messagesRef);
@@ -123,17 +124,15 @@
                 password: password,
                 text: text,
                 date: new Date().toLocaleString('ko-KR'),
-                pinned: false,
-                timestamp: serverTimestamp()
+                pinned: false
             });
-
-            lastSubmitTime = Date.now();
 
             usernameInput.value = "";
             passwordInput.value = "";
             messageInput.value = "";
         } catch (error) {
-            alert("서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+            alert("전송 실패: Firebase Rules 설정을 확인해 주세요.");
+            localStorage.removeItem("lastSubmitTime");
         } finally {
             setTimeout(() => {
                 submitBtn.disabled = false;
@@ -151,14 +150,14 @@
 
         const keys = Object.keys(data);
         
-        const pinnedKeys = keys.filter(key => data[key].pinned === true).reverse();
-        const normalKeys = keys.filter(key => !data[key].pinned).reverse();
+        const pinnedKeys = keys.filter(key => data[key] && data[key].pinned === true).reverse();
+        const normalKeys = keys.filter(key => data[key] && !data[key].pinned).reverse();
         
         const sortedKeys = [...pinnedKeys, ...normalKeys];
 
         sortedKeys.forEach(key => {
             const msg = data[key];
-            if (!msg.name) return;
+            if (!msg || !msg.name) return;
             
             const card = document.createElement("div");
             card.className = `message-card ${msg.pinned ? 'pinned' : ''}`;
