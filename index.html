@@ -14,6 +14,7 @@
         textarea { resize: vertical; height: 100px; }
         button { width: 100%; padding: 12px; background-color: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; }
         button:hover { background-color: #45a049; }
+        button:disabled { background-color: #aaaaaa; cursor: not-allowed; }
         .message-list { margin-top: 30px; }
         .message-card { background: #fafafa; border-left: 5px solid #2196F3; padding: 15px; margin-bottom: 15px; border-radius: 0 6px 6px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); position: relative; }
         .message-card.pinned { background: #fffde7; border-left: 5px solid #ffc107; }
@@ -66,6 +67,7 @@
     let localMessages = {};
 
     document.getElementById("submitBtn").addEventListener("click", async () => {
+        const submitBtn = document.getElementById("submitBtn");
         const usernameInput = document.getElementById("username");
         const passwordInput = document.getElementById("password");
         const messageInput = document.getElementById("message");
@@ -103,6 +105,9 @@
             return;
         }
 
+        submitBtn.disabled = true;
+        submitBtn.innerText = "3초 대기...";
+
         const newPostRef = push(messagesRef);
         await set(newPostRef, {
             name: name,
@@ -115,6 +120,11 @@
         usernameInput.value = "";
         passwordInput.value = "";
         messageInput.value = "";
+
+        setTimeout(() => {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "글 남기기";
+        }, 3000);
     });
 
     onValue(messagesRef, (snapshot) => {
