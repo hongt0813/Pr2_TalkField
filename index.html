@@ -64,7 +64,8 @@
     const auth = getAuth(app);
     const messagesRef = ref(db, 'messages');
 
-    const MASTER_PASSWORD_HASH = "8c696f43da13b6d4036ec0815127814b7e87b7a4214690838e1261a8ef6a928c"; 
+    // 원래 쓰던 마스터 비밀번호 문자열 그대로 복구
+    const MASTER_PASSWORD = "readyfor0813"; 
     let localMessages = {};
 
     async function hashPassword(password) {
@@ -211,9 +212,8 @@
         const inputMasterPassword = prompt(`제작자 인증이 필요합니다.\n마스터 비밀번호를 입력하세요:`);
         if (inputMasterPassword === null) return;
 
-        const inputHash = await hashPassword(inputMasterPassword.trim());
-
-        if (inputHash === MASTER_PASSWORD_HASH) {
+        // 마스터 비밀번호는 해싱하지 않고 입력값 그대로 기존 평문 변수와 다이렉트 비교
+        if (inputMasterPassword.trim() === MASTER_PASSWORD) {
             await update(ref(db, `messages/${id}`), {
                 pinned: !currentPinnedStatus
             });
